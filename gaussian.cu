@@ -61,15 +61,11 @@ void kernel(double* tab, double* gaussian, int width, int height, int pitch) {
 // Driver program to test above function 
 int main() 
 {
-    cv::cuda::DeviceInfo info = cv::cuda::getDevice();
-    std::cout << info.name() << std::endl;
 
     size_t pitch;
     int N = 1<<20;
     int blockSize = 256;
     int numBlocks = (N + blockSize - 1) / blockSize;
-    printf("Block Size: %d\tNum Blocks: %d", blockSize, numBlocks);
- 	getchar();
 
     // Create Gaussian circle
     int dim = 15;
@@ -81,8 +77,7 @@ int main()
     check(cudaMemset(GKernel, 0, filterSize));
     FilterCreation<<<blockSize, numBlocks>>>(GKernel, dim); 
 	check(cudaMemcpy2D(DKernel, dim*sizeof(double), GKernel, pitch, dim*sizeof(double), dim, cudaMemcpyDeviceToHost));
-    showMatrix2(DKernel, dim, dim);
-	getchar();
+    //showMatrix2(DKernel, dim, dim);
 
 	// int imgSize = 16;
     // double* d_tab;
