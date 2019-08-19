@@ -47,6 +47,11 @@ void FilterCreation(double* gaussian, int dim)
     }
 }
 
+template <typename T> 
+__device__ T& getPixelPitched(T* array, size_t row, size_t column, size_t pitch) {
+   return  *((T*)((char*)array + row * pitch) + column);
+}
+
 __global__ 
 void kernel(double* tab, double* gaussian, int width, int height, int pitch) {
 	//x_offset = threadIdx.x + blockIdx.x * blockDim.x;
@@ -56,7 +61,7 @@ void kernel(double* tab, double* gaussian, int width, int height, int pitch) {
     int col = threadIdx.y + blockIdx.y * blockDim.y;
     if (row < width && col < height) {
         //*( ((double *)(((char *)tab) + (row * pitch))) + col) = 1.0f;
-		tab[row * pitch + col] = 1.0f;
+		getPixelPitched(tab, width, height, pitch) = 1.0f;
     }
 }
   
