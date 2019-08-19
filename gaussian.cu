@@ -35,18 +35,22 @@ void FilterCreation(double* GKernel, int dim)
   
     // generating dim x dim kernel
     int filterWidth = dim / 2;
+
     for (int x = -filterWidth; x <= filterWidth; x++) { 
-        for (int y = -filterWidth; y <= filterWidth; y++) { 
-            r = sqrt((float) x * x + y * y); 
-            
-            GKernel[(x + filterWidth)*dim + (y + filterWidth)] = (exp(-(r * r) / s)) / (M_PI * s);
-            sum += GKernel[(x + filterWidth)*dim + (y + filterWidth)];
-        } 
+        for (int y = -filterWidth; y <= filterWidth; y++) {
+            if(y < dim && x < dim) {
+                r = sqrt((float) x * x + y * y); 
+                GKernel[(x + filterWidth)*dim + (y + filterWidth)] = (exp(-(r * r) / s)) / (M_PI * s);
+                sum += GKernel[(x + filterWidth)*dim + (y + filterWidth)];
+            }
+        }
     }
     // normalising the Kernel 
-    for (int i = 0; i < dim; ++i) 
-        for (int j = 0; j < dim; ++j) 
+    for (int i = 0; i < dim; ++i) { 
+        for (int j = 0; j < dim; ++j) { 
             GKernel[i*dim + j] /= sum; 
+        }
+    }
 }
 
 __global__ 
@@ -77,7 +81,7 @@ int main()
     check(cudaMemset(GKernel, 0, filterSize));
     FilterCreation<<<blockSize, numBlocks>>>(GKernel, dim); 
 	check(cudaMemcpy2D(DKernel, dim*sizeof(double), GKernel, pitch, dim*sizeof(double), dim, cudaMemcpyDeviceToHost));
-    //showMatrix2(DKernel, dim, dim);
+    showMatrix2(DKernel, dim, dim);
 
 	// int imgSize = 16;
     // double* d_tab;
