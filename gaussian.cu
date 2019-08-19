@@ -61,7 +61,7 @@ void kernel(double* tab, double* gaussian, int width, int height, int pitch) {
     int col = threadIdx.y + blockIdx.y * blockDim.y;
     if (row < width && col < height) {
         //*( ((double *)(((char *)tab) + (row * pitch))) + col) = 1.0f;
-		getPixelPitched(tab, width, height, pitch) = 1.0f;
+		getPixelPitched(tab, row, col, pitch) = 1.0f;
     }
 }
   
