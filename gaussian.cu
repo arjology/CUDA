@@ -23,42 +23,40 @@ void showMatrix2(double* v1, int width, int height) {
 }
 
 // Function to create Gaussian filter 
-__global__
-void FilterCreation(double* GKernel, int dim) 
+void FilterCreation(double* gaussian, int dim) 
 { 
     // intialising standard deviation to 1.0 
-    double sigma = 10.0; 
+    double sigma = 4.0; 
     double r, s = 2.0 * sigma * sigma; 
-  
     // sum is for normalization 
     double sum = 0.0; 
-  
     // generating dim x dim kernel
     int filterWidth = dim / 2;
-
     for (int x = -filterWidth; x <= filterWidth; x++) { 
         for (int y = -filterWidth; y <= filterWidth; y++) {
-            if(y < dim && x < dim) {
                 r = sqrt((float) x * x + y * y); 
-                GKernel[(x + filterWidth)*dim + (y + filterWidth)] = (exp(-(r * r) / s)) / (M_PI * s);
-                sum += GKernel[(x + filterWidth)*dim + (y + filterWidth)];
-            }
+                gaussian[(x + filterWidth)*dim + (y + filterWidth)] = (exp(-(r * r) / s)) / (M_PI * s);
+                sum += gaussian[(x + filterWidth)*dim + (y + filterWidth)];
         }
     }
     // normalising the Kernel 
     for (int i = 0; i < dim; ++i) { 
         for (int j = 0; j < dim; ++j) { 
-            GKernel[i*dim + j] /= sum; 
+            gaussian[i*dim + j] /= sum; 
         }
     }
 }
 
 __global__ 
 void kernel(double* tab, double* gaussian, int width, int height, int pitch) {
+	//x_offset = threadIdx.x + blockIdx.x * blockDim.x;
+	//y_offset = threadIdx.y + blockIdx.y * blockDim.y;
+	//tab[x0+x_offset + (y0+y_offset)*image_width] = 1
     int row = threadIdx.x + blockIdx.x * blockDim.x;
     int col = threadIdx.y + blockIdx.y * blockDim.y;
     if (row < width && col < height) {
-        *( ((double *)(((char *)tab) + (row * pitch))) + col) = 1.0f;
+        //*( ((double *)(((char *)tab) + (row * pitch))) + col) = 1.0f;
+		tab[row * pitch + col] = 1.0f;
     }
 }
   
@@ -68,7 +66,7 @@ int main()
 
     size_t pitch;
     int N = 1<<20;
-    int blockSize = 256;
+    int blockSize = 512;
     int numBlocks = (N + blockSize - 1) / blockSize;
 
     // Create Gaussian circle
@@ -79,37 +77,39 @@ int main()
     check(cudaMallocPitch(&GKernel, &pitch, dim * sizeof(double), dim));
 	DKernel = (double*)malloc(filterSize);
     check(cudaMemset(GKernel, 0, filterSize));
-    FilterCreation<<<blockSize, numBlocks>>>(GKernel, dim); 
-	check(cudaMemcpy2D(DKernel, dim*sizeof(double), GKernel, pitch, dim*sizeof(double), dim, cudaMemcpyDeviceToHost));
+    FilterCreation(DKernel, dim); 
+	//check(cudaMemcpy2D(DKernel, dim*sizeof(double), GKernel, pitch, dim*sizeof(double), dim, cudaMemcpyDeviceToHost));
     showMatrix2(DKernel, dim, dim);
 
-	// int imgSize = 16;
-    // double* d_tab;
-	// double* h_tab;
-    // int realSize = imgSize * imgSize * sizeof(double);
-    // check(cudaMallocPitch(&d_tab, &pitch, imgSize * sizeof(double), imgSize));
-    // h_tab = (double*)malloc(realSize);
-    // check( cudaMemset(d_tab, 0, realSize) );
-    // kernel <<<grid, block>>>(d_tab, GKernel, imgSize, imgSize, pitch);
-    // check(cudaMemcpy2D(h_tab, imgSize*sizeof(double), d_tab, pitch, imgSize*sizeof(double), imgSize, cudaMemcpyDeviceToHost));
-    // showMatrix2(h_tab, imgSize, imgSize);
-    // printf("\nPitch size: %d \n", pitch);
-    // getchar();
+	int imgSize = 16;
+    double* d_tab;
+	double* h_tab;
+    dim3 grid(4,4);
+	dim3 block(4,4); 
+    int realSize = imgSize * imgSize * sizeof(double);
+    check(cudaMallocPitch(&d_tab, &pitch, imgSize * sizeof(double), imgSize));
+    h_tab = (double*)malloc(realSize);
+    check( cudaMemset(d_tab, 0, realSize) );
+    kernel <<<grid, block>>>(d_tab, GKernel, imgSize, imgSize, pitch);
+    check(cudaMemcpy2D(h_tab, imgSize*sizeof(double), d_tab, pitch, imgSize*sizeof(double), imgSize, cudaMemcpyDeviceToHost));
+    showMatrix2(h_tab, imgSize, imgSize);
+    printf("\nPitch size: %d \n", pitch);
+    getchar();
 
-    // // Read blank image and display
-    // uint8_t *imgPtr;
-    // cv::Mat srcImg, dstImg;
-    // cv::cuda::GpuMat gpuImg;
+    // Read blank image and display
+    uint8_t *imgPtr;
+    cv::Mat srcImg, dstImg;
+    cv::cuda::GpuMat gpuImg;
 
-    // srcImg = cv::imread("figs/blank.jpg", cv::IMREAD_GRAYSCALE);
-    // gpuImg.upload(srcImg);
-    // cudaMalloc((void **)&imgPtr, gpuImg.rows*gpuImg.step);
-    // check(cudaMemcpyAsync(imgPtr, gpuImg.ptr<uint8_t>(), gpuImg.rows*gpuImg.step, cudaMemcpyDeviceToDevice));
-    // cv::cuda::GpuMat gpuSrc(srcImg.rows, srcImg.cols, srcImg.type(), imgPtr, gpuImg.step);
-    // gpuImg.download(dstImg);
-    // // cv::imshow("test", dstImg);
-    // // cv::waitKey(0);
-    // cv::imwrite("figs/blank_mod.png", dstImg);
+    srcImg = cv::imread("figs/blank.jpg", cv::IMREAD_GRAYSCALE);
+    gpuImg.upload(srcImg);
+    cudaMalloc((void **)&imgPtr, gpuImg.rows*gpuImg.step);
+    check(cudaMemcpyAsync(imgPtr, gpuImg.ptr<uint8_t>(), gpuImg.rows*gpuImg.step, cudaMemcpyDeviceToDevice));
+    cv::cuda::GpuMat gpuSrc(srcImg.rows, srcImg.cols, srcImg.type(), imgPtr, gpuImg.step);
+    gpuImg.download(dstImg);
+    // cv::imshow("test", dstImg);
+    // cv::waitKey(0);
+    cv::imwrite("figs/blank_mod.png", dstImg);
 
     return 0;
 }
